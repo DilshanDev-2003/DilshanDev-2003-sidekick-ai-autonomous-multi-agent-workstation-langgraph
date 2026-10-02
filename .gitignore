@@ -1,0 +1,28 @@
+# Python / Virtual Environment
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+
+# Environment variables & secrets
+.env
+
+# SQLite Databases & Memory Checkpoints
+*.db
+*.sqlite
+sidekick_app.db
+sidekick_memory.sqlite
+
+# Sandbox outputs
+sandboxx/*
+!sandboxx/.gitkeep
+
+# Playwright & Browsers
+.playwright/
+test-results/
+
+# IDE / Editor Files
+.vscode/
+.idea/
+*.swp

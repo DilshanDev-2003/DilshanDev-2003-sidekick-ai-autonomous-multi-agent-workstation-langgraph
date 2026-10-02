@@ -1,0 +1,14 @@
+langchain
+langchain-core
+langchain-community
+langchain-experimental
+langchain-google-genai
+langgraph
+langgraph-checkpoint-sqlite
+playwright
+pydantic
+python-dotenv
+requests
+google-search-results
+wikipedia
+gradio
