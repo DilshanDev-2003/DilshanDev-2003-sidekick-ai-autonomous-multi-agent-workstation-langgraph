@@ -5,7 +5,7 @@ from playwright.async_api import async_playwright
 
 from langchain_core.tools import Tool
 from langchain_community.agent_toolkits import FileManagementToolkit, PlayWrightBrowserToolkit
-from langchain_community.tools.sql_database.tool import QuerySQLDataBaseTool
+from langchain_community.tools import QuerySQLDatabaseTool
 from langchain_community.tools.wikipedia.tool import WikipediaQueryRun
 from langchain_community.utilities import GoogleSerperAPIWrapper, SQLDatabase
 from langchain_community.utilities.wikipedia import WikipediaAPIWrapper
@@ -20,7 +20,7 @@ serper = GoogleSerperAPIWrapper()
 
 async def playwright_tools():
   playwright = await async_playwright().start()
-  async_browser = await playwright.chromium.launch(headless=False)
+  async_browser = await playwright.chromium.launch(headless=True)
   playwright_toolkit = PlayWrightBrowserToolkit.from_browser(async_browser=async_browser)
   return playwright_toolkit.get_tools(), async_browser, playwright
 
@@ -54,7 +54,7 @@ async def other_tools():
   python_repl_tool = PythonREPLTool()
 
   db = SQLDatabase.from_uri("sqlite:///sidekick_app.db")
-  sql_tool = QuerySQLDataBaseTool(db=db)
+  sql_tool = QuerySQLDatabaseTool(db=db)
   sql_agent_tool = Tool(
     name="sql_query_tool",
     func=sql_tool.invoke,

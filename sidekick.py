@@ -10,7 +10,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
-from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from sidekick_tools import playwright_tools, other_tools
 
@@ -37,11 +37,11 @@ class Sidekick:
     self.graph = None
     self.browser = None
     self.playwright = None
-    self.db_conn = SqliteSaver.from_conn_string("sqlite:///sidekick_memory.sqlite")
+    self._saver_cm = None
 
   async def setup(self):
     self.tools, self.browser, self.playwright = await playwright_tools()
-    self.tools += other_tools()
+    self.tools += await other_tools()
 
     llm = ChatGoogleGenerativeAI(model="gemini-3.5-flash")
 
@@ -49,7 +49,10 @@ class Sidekick:
     self.worker_llm_with_tools = llm.bind_tools(self.tools)
     self.evaluator_llm_with_output = llm.with_structured_output(EvaluatorOutput)
 
-    await self.build_graph()
+    self._saver_cm = AsyncSqliteSaver.from_conn_string("sidekick_memory.sqlite")
+    checkpointer = await self._saver_cm.__aenter__()
+        
+    await self.build_graph(checkpointer)
 
   def planner(self, state: State) -> Dict[str, Any]:
     """ Creates the plan and ask clarifying questions from the user """
@@ -83,7 +86,7 @@ class Sidekick:
     return {"messages": [response]}
 
   def worker_router(self, state: State) -> str:
-    last_message = state["messages"][-1].content
+    last_message = state["messages"][-1]
     if hasattr(last_message, "tool_calls") and last_message.tool_calls:
       return "tools"
     return "evaluator"
@@ -122,7 +125,7 @@ class Sidekick:
       return "END"
     return "worker"
 
-  async def build_graph(self):
+  async def build_graph(self, checkpointer):
     graph_builder = StateGraph(State)
 
     graph_builder.add_node("planner", self.planner)
@@ -136,7 +139,7 @@ class Sidekick:
     graph_builder.add_edge("tools", "worker")
     graph_builder.add_conditional_edges("evaluator", self.route_based_on_evaluation, {"worker": "worker", "END": END})
 
-    self.graph = graph_builder.compile(checkpointer=self.db_conn)
+    self.graph = graph_builder.compile(checkpointer=checkpointer)
 
   async def run_superstep(self, message: str, success_criteria: str, history: list):
     config = {"configurable": {"thread_id": self.username}}
@@ -154,14 +157,10 @@ class Sidekick:
     reply = result["messages"][-1].content
     return history + [{"role": "user", "content": message}, {"role": "assistant", "content": reply}]  
 
-  def cleanup(self):
+  async def cleanup(self):
     if self.browser:
-      try:
-        loop = asyncio.get_running_loop()
-        loop.create_task(self.browser.close())
-        if self.playwright:
-          loop.create_task(self.playwright.stop())
-      except RuntimeError:
-        asyncio.run(self.browser.close())
-        if self.playwright:
-          asyncio.run(self.playwright.stop())
+      await self.browser.close()
+    if self.playwright:
+      await self.playwright.stop()
+    if self._saver_cm:
+      await self._saver_cm.__aexit__(None, None, None)
