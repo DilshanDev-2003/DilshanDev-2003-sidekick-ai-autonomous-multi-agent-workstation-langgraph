@@ -5,10 +5,12 @@ langchain-experimental
 langchain-google-genai
 langgraph
 langgraph-checkpoint-sqlite
+aiosqlite
 playwright
 pydantic
 python-dotenv
 requests
 google-search-results
 wikipedia
+beautifulsoup4
 gradio
